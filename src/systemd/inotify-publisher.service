@@ -1,0 +1,12 @@
+[Unit]
+Description=inotifywait-based Jamulus jam publisher
+; Needs local file systems mounted but that's about it - covered by default basic.target
+
+[Service]
+Type=simple
+ExecStart=/opt/Jamulus/bin/inotify-publisher.sh
+User=Jamulus
+Group=Jamulus
+
+[Install]
+WantedBy=multi-user.target
