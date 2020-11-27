@@ -15,8 +15,12 @@ cat <<-HELPMSG
 	The script should be run from the directory containing the "failed" recording.
 	It outputs the RPP file on stdout - redirect this to your chosen project filename.
 
-	It requires  /etc/init.d/Jamulus  to be the provided start up script, so it can
-	read the configuration settings.
+	There are two variables you need to set - JAMULUS_SERVERNAME and JAMULUS_OPTS.
+
+	JAMULUS_SERVERNAME can be anything you link without spaces.
+
+	JAMULUS_OPTS should match the values you use to run the Jamulus server -- although
+	only the -F option is relevant (and it needs to be the short version here).
 
 HELPMSG
 	exit 0
