@@ -1,37 +1,79 @@
 #!/bin/bash -e
-if [[ "$1" == "--help" ]]
-then
+fHelp() {
 cat <<-HELPMSG
-	Recreate a Reaper RPP project file from a Jamulus recording directory.
+	Recreate the Reaper RPP or Audacity LOF project files from a Jamulus recording directory.
 
-	$(basename "$0") [--help]
-	  --help  display this help message
+	$(basename "$0") [--help] [--nofastupdate] [--servername 'server name']
+	                 [--rpp [ - | filename.rpp ] ] [--lof [ - | filename.lof ] ]
+	  --help          display this help message
+	  --nofastupdate  by default, processing assumes "fastupdate" was enabled for
+	                  the recording being recovered.  Use this if it was not.
+	  --servername    anything you want - used in RPP UUID generation.
+	  --rpp           if specified, write RPP output to the named file.  If --lof
+	                  is not specified as well, only the RPP will be written.
+	  --lof           if specified, write RPP output to the named file.  If --rpp
+	                  is not specified as well, only the LOF will be written.
 
 	The intent of this script is to take an existing collection of Jamulus recorded
-	WAVE files and generate a Reaper RPP project file that matches the one the server
-	should have created.  It may sometimes be needed, for example when the server fails
-	to terminate the recording correctly (as that is when the RPP file gets written).
+	WAVE files and generate the Reaper RPP and Audacity LOF project files that match
+	the one the server should have created.  It may sometimes be needed, for example
+	when the server fails to terminate the recording correctly (as that is when the
+	project files gets written).
 
 	The script should be run from the directory containing the "failed" recording.
-	It outputs the RPP file on stdout - redirect this to your chosen project filename.
-
-	There are two variables you need to set - JAMULUS_SERVERNAME and JAMULUS_OPTS.
-
-	JAMULUS_SERVERNAME can be anything you link without spaces.
-
-	JAMULUS_OPTS should match the values you use to run the Jamulus server -- although
-	only the -F option is relevant (and it needs to be the short version here).
+	By default, the script writes both RPP and LOF projects to files, using the working
+	directory name and appropriate suffix.  "--rpp" and "--lof" can optionally be
+	followed by a filename, which can be "-" for stdout.  If only one of the two is
+	specified, the other is not written at all.
 
 HELPMSG
-	exit 0
-fi
+}
 
-# Set the variables
+# Set the variable defaults
 JAMULUS_SERVERNAME=jamulus.drealm.info
-JAMULUS_OPTS=("-F")
+frameRate=64
 
-siteNamespace=$(uuidgen -n @url -N jamulus:${JAMULUS_SERVERNAME} --sha1)
-projectName=$(basename "$(pwd)")
+is_rpp=false
+is_lof=false
+do_rpp=false
+do_lof=false
+while { arg=$1; shift; }
+do
+	case "$arg" in
+	"-h" | "--help") fHelp; exit 0
+		;;
+	"--nofastupdate") frameRate=128; is_rpp=false; is_lof=false
+		;;
+	"--servername")
+		[[ $# -gt 0 ]] || { echo '--servername requires a server name'; exit 1; }
+		JAMULUS_SERVERNAME="$1"; is_rpp=false; is_lof=false; shift
+		;;
+	"--rpp")
+		is_rpp=true; is_lof=false; do_rpp=true
+		;;
+	"--lof")
+		is_rpp=false; is_lof=true; do_lof=true
+		;;
+	*)
+		[[ $is_rpp ]] && {
+			RPP_NAME="$arg"
+			is_rpp=false
+		}
+		[[ $is_rpp ]] && {
+			LOF_NAME="$arg"
+			is_lof=false
+		}
+	esac
+done
+
+# Neither argument specified, write both
+if [[ ! $do_rpp && ! $do_lof ]]
+then
+	no_rpp=false
+	no_lof=false
+fi;
+
+projectName="$(basename "$(realpath "$(pwd)")")"
 
 if [[ "${projectName:0:4}" != "Jam-" ]]
 then
@@ -45,22 +87,37 @@ then
 	exit 1
 fi
 
+echo "Project will be recovered with a frame rate of $frameRate samples per frame"
+
+RPP_NAME="${RPP_NAME:-$projectName.rpp}"
+LOF_NAME="${LOF_NAME:-$projectName.lof}"
+
+[[ "x$RPP_NAME" == "-" ]] && RPP_NAME="/dev/stdout"
+[[ "x$LOF_NAME" == "-" ]] && LOF_NAME="/dev/stdout"
+
+siteNamespace=$(uuidgen -n @url -N "jamulus:${JAMULUS_SERVERNAME}" --sha1)
+
 projectNamespace=$(uuidgen -n $siteNamespace -N "${projectName}" --sha1)
 projectDate=$( p=${projectName#Jam-}; echo ${p:0:4}-${p:4:2}-${p:6:2} ${p:9:2}:${p:11:2}:${p:13:2}.${p:15} )
-frameRate=$([[ ${JAMULUS_OPTS[@]} =~ " -F" ]] && echo 64 || echo 128)
 
 secondsAt48K () {
 	echo $1 | awk '{ printf "%.14f\n", $1 / 48000; }'
 }
 
+$do_rpp && { {
 echo '<REAPER_PROJECT 0.1 "5.0"' $(date -d "$projectDate" -u '+%s')
 echo ' RECORD_PATH "" ""'
 echo ' SAMPLERATE 48000 0 0'
 echo ' TEMPO 120 4 4'
+} > $RPP_NAME; }
+$do_lof && { {
+echo -n ;# do nothing
+} > $LOF_NAME
+}
 
 iid=0
 prevIP=''
-for x in $(ls -1 *.wav | sort -t- -k2)
+for x in $(ls -1v *.wav | sort -t- -k2)
 do
 
 	# Some initial cleaning up
@@ -88,25 +145,32 @@ do
 		iidt=0
 		if [[ "$prevIP" != "" ]]
 		then
+$do_rpp && { {
 			echo '  NAME '$trackName
 			echo ' >'
+} >> $RPP_NAME; }
 		fi
 		prevIP="$IP"
+$do_rpp && { {
 		echo ' <TRACK {'$(uuidgen -n $projectNamespace -N $IP --sha1)'}'
 		echo '  TRACKID {'$(uuidgen -n $projectNamespace -N $IP --sha1)'}'
+} >> $RPP_NAME; }
 		trackName="${x%-*-*.wav}"
 	else
 		[[ "${trackName:0:5}" == "____-" ]] && trackName="${x%-*-*.wav}"
 	fi
 	(( iid++ )) || true
 	(( iidt++ )) || true
+	filePos="${x#*-*-}"
+	filePos="${filePos%-*.wav}"
+	position=$(secondsAt48K $(( $filePos * $frameRate )) )
+	length=$(secondsAt48K $(soxi -s "$x"))
+$do_rpp && { {
 	echo '  <ITEM'
 	echo '   FADEIN 0 0 0 0 0 0'
 	echo '   FADEOUT 0 0 0 0 0 0'
-	filePos="${x#*-*-}"
-	filePos="${filePos%-*.wav}"
-	echo '   POSITION '$(secondsAt48K $(( $filePos * $frameRate )) )
-	echo '   LENGTH '$(secondsAt48K $(soxi -s "$x"))
+	echo '   POSITION '$position
+	echo '   LENGTH '$length
 	echo '   IGUID {'$(uuidgen -n $projectNamespace -N $IP --sha1)'}'
 	echo '   IID '$iid
 	echo '   NAME '$IP' ('$iidt')'
@@ -115,10 +179,18 @@ do
 	echo '    FILE "'$x'"'
 	echo '   >'
 	echo '  >'
+} >> $RPP_NAME; }
+$do_lof && { {
+        echo 'file "'${x}'" offset '$(secondsAt48K $(( $filePos * $frameRate )) )
+} >> $LOF_NAME; }
 done
 if [[ "$prevIP" != "" ]]
 then
+$do_rpp && { {
 	echo '  NAME '$trackName
 	echo ' >'
+} >> $RPP_NAME; }
 fi
+$do_rpp && { {
 echo '>'
+} >> $RPP_NAME; }

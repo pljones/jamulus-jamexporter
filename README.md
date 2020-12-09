@@ -72,18 +72,15 @@ that user's public key in your hosting provider's `authorized_keys` (using the e
 
 
 ## recover-recording.sh
-Also included is a "recovery mode" script.  If the RPP file isn't generated when a recording is in progress, this generates
-the file.  It's essential to tell it whether you have 64 or 128 sample frames or the timing will go horribly wrong.
-The server name is just for the namespace UUID creation.
-* `JAMULUS_SERVERNAME=jamulus.drealm.info`
-* `JAMULUS_OPTS=("-F")`
+Also included is a "recovery mode" script.  This helps you recreate any lost Reaper RPP or Audacity LOF
+project files from a Jamulus recording directory.  There is a `--help` option that provides the full syntax.
 
-Note the format of `JAMULUS_OPTS` is a bash array, as it's taken from my server run configuration.
-You need to use `-F` here, if you use 64 sample frames -- `--fastupdate` isn't supported.
+The intent of this script is to take an existing collection of Jamulus recorded WAVE files and generate the
+Reaper RPP and Audacity LOF project files that match the one the server should have created.
+It may sometimes be needed, for example when the server fails to terminate the recording correctly
+(as that is when the project files gets written).
 
-The script does have a `--help` option.  Run it from the directory containing the failed recording.
-It emits the RPP to stdout - you can redirect it to a file of your choosing.
-
-Note that `inotify-publisher.sh` will have "skipped" this directory in its monitoring, as no RPP existed.
-If no recording is currently in progress and you want to make inotify-publisher.sh notice the repair, create and then
-delete a directory in the base recording directory.
+The script should be run from the directory containing the "failed" recording.
+By default, the script writes both RPP and LOF projects to files, using the working directory name and appropriate suffix.
+`--rpp` and `--lof` can optionally be followed by a filename, which can be `-` for stdout.
+If only one of the two is specified, the other is not written at all.
