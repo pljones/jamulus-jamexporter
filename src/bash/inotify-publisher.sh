@@ -23,6 +23,7 @@ JAMULUS_ROOT=/opt/Jamulus
 JAMULUS_RECORDING_DIR=${JAMULUS_ROOT}/run/recording
 JAMULUS_STATUSPAGE=${JAMULUS_ROOT}/run/status.html
 PUBLISH_SCRIPT=${JAMULUS_ROOT}/bin/publish-recordings.sh
+CHECK_INTERVAL=$(( 5 * 60 ))
 NO_CLIENT_CONNECTED="No client connected"
 
 # Most recent processing check
@@ -30,13 +31,15 @@ MOST_RECENT=0
 
 # Do not return until a new jamdir exists in the recording dir
 wait_for_new_jamdir () {
-	while [[ ${MOST_RECENT} -ge $(date -r "${JAMULUS_RECORDING_DIR}" "+%s")
-		|| -z $(find "${JAMULUS_RECORDING_DIR}" -mindepth 1 -type d -prune) ]]
+	while [[ ${MOST_RECENT} -ge $(date -r "${JAMULUS_RECORDING_DIR}" "+%s") ||
+		-z $(find -L "${JAMULUS_RECORDING_DIR}" -mindepth 1 -type d -prune) ]]
 	do
-		inotifywait -q -e create -e close_write "${JAMULUS_RECORDING_DIR}"
+		inotifywait -q -t ${CHECK_INTERVAL} -e create -e close_write "${JAMULUS_RECORDING_DIR}"
 	done
+	MOST_RECENT=$(date -r "${JAMULUS_RECORDING_DIR}" "+%s")
 	true
 }
+#
 
 # Do not return until the server has no connections
 wait_for_quiet () {
@@ -56,6 +59,5 @@ wait_for_quiet () {
 
 while wait_for_new_jamdir && wait_for_quiet
 do
-	MOST_RECENT=$(date -r "${JAMULUS_RECORDING_DIR}" "+%s")
 	"${PUBLISH_SCRIPT}" || true
 done
