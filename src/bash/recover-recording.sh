@@ -37,6 +37,8 @@ is_rpp=false
 is_lof=false
 do_rpp=false
 do_lof=false
+unset RPP_NAME
+unset LOF_NAME
 while { arg=$1; shift; }
 do
 	case "$arg" in
@@ -55,23 +57,26 @@ do
 		is_rpp=false; is_lof=true; do_lof=true
 		;;
 	*)
-		[[ $is_rpp ]] && {
+		if $is_rpp
+		then
 			RPP_NAME="$arg"
 			is_rpp=false
-		}
-		[[ $is_rpp ]] && {
+		elif $is_lof
+		then
 			LOF_NAME="$arg"
 			is_lof=false
-		}
+		else
+			echo "Unrecognised argument '$arg'.  Use '--help' for help." >&2
+			exit 1
+		fi
 	esac
 done
 
 # Neither argument specified, write both
-if [[ ! $do_rpp && ! $do_lof ]]
-then
-	no_rpp=false
-	no_lof=false
-fi;
+$do_rpp || $do_lof || {
+	do_rpp=true
+	do_lof=true
+}
 
 projectName="$(basename "$(realpath "$(pwd)")")"
 
@@ -89,11 +94,11 @@ fi
 
 echo "Project will be recovered with a frame rate of $frameRate samples per frame"
 
-RPP_NAME="${RPP_NAME:-$projectName.rpp}"
-LOF_NAME="${LOF_NAME:-$projectName.lof}"
+$do_rpp && RPP_NAME="${RPP_NAME:-$projectName.rpp}"
+$do_lof && LOF_NAME="${LOF_NAME:-$projectName.lof}"
 
-[[ "x$RPP_NAME" == "-" ]] && RPP_NAME="/dev/stdout"
-[[ "x$LOF_NAME" == "-" ]] && LOF_NAME="/dev/stdout"
+[[ "x$RPP_NAME" == "x-" ]] && RPP_NAME="/dev/stdout"
+[[ "x$LOF_NAME" == "x-" ]] && LOF_NAME="/dev/stdout"
 
 siteNamespace=$(uuidgen -n @url -N "jamulus:${JAMULUS_SERVERNAME}" --sha1)
 
@@ -117,7 +122,8 @@ echo -n ;# do nothing
 
 iid=0
 prevIP=''
-for x in $(ls -1v *.wav | sort -t- -k2)
+
+ls -1v *.wav | sort -t- -k2 | while read x
 do
 
 	# Some initial cleaning up
