@@ -19,7 +19,9 @@
 #    See LICENCE.txt for the full text.
 
 RECORDING_DIR=/opt/Jamulus/run/recording
-RECORDING_HOST_DIR=drealm.info:html/jamulus/
+#RECORDING_HOST_DIR=drealm.info:html/jamulus/
+RECORDING_HOST=drealm.info
+RECORDING_HOST_DIR=jamulus/
 
 cd "${RECORDING_DIR}"
 
@@ -100,8 +102,15 @@ do
 	else
 		zip -r "${jamDir}.zip" "${jamDir}" -i '*.opus' '*.rpp' && {
 			rm -r "${jamDir}"
+			read x x x x lZipSize x < <(ls -l "${jamDir}.zip")
 			i=10
-			while [[ $i -gt 0 ]] && ! scp -o ConnectionAttempts=6 "${jamDir}.zip" ${RECORDING_HOST_DIR}
+			# while [[ $i -gt 0 ]] && ! scp -o ConnectionAttempts=6 "${jamDir}.zip" ${RECORDING_HOST_DIR}
+			while [[ $i -gt 0 ]] && ! {
+				echo put '"'"${jamDir}.zip"'"' '"'"${RECORDING_HOST_DIR}/${jamDir#./}.zip"'"' | ftp -p ${RECORDING_HOST}
+				read x x x x rZipSize x < <(echo ls '"'"${RECORDING_HOST_DIR}/${jamDir#./}.zip"'"' | ftp -p ${RECORDING_HOST})
+echo lZipSize $lZipSize rZipSize $rZipSize
+				[[ $lZipSize == $rZipSize ]]
+			}
 			do
 				(( i-- ))
 				sleep $(( 11 - i ))
