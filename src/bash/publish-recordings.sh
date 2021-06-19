@@ -21,7 +21,7 @@
 RECORDING_DIR=/opt/Jamulus/run/recording
 #RECORDING_HOST_DIR=drealm.info:html/jamulus/
 RECORDING_HOST=drealm.info
-RECORDING_HOST_DIR=jamulus/
+RECORDING_HOST_DIR=jamulus
 
 cd "${RECORDING_DIR}"
 
@@ -106,9 +106,10 @@ do
 			i=10
 			# while [[ $i -gt 0 ]] && ! scp -o ConnectionAttempts=6 "${jamDir}.zip" ${RECORDING_HOST_DIR}
 			while [[ $i -gt 0 ]] && ! {
+				echo put '"'"${jamDir}.zip"'"' '"'"${RECORDING_HOST_DIR}/${jamDir#./}.zip"'"'
 				echo put '"'"${jamDir}.zip"'"' '"'"${RECORDING_HOST_DIR}/${jamDir#./}.zip"'"' | ftp -p ${RECORDING_HOST}
 				read x x x x rZipSize x < <(echo ls '"'"${RECORDING_HOST_DIR}/${jamDir#./}.zip"'"' | ftp -p ${RECORDING_HOST})
-echo lZipSize $lZipSize rZipSize $rZipSize
+				echo lZipSize $lZipSize rZipSize $rZipSize
 				[[ $lZipSize == $rZipSize ]]
 			}
 			do
