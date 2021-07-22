@@ -21,7 +21,7 @@
 RECORDING_DIR=/opt/Jamulus/run/recording
 #RECORDING_HOST_DIR=drealm.info:html/jamulus/
 RECORDING_HOST=drealm.info
-RECORDING_HOST_DIR=jamulus
+RECORDING_HOST_DIR=/public_html/jamulus
 
 cd "${RECORDING_DIR}"
 
