@@ -31,7 +31,7 @@ MOST_RECENT=0
 
 # Do not return until a new jamdir exists in the recording dir
 wait_for_new_jamdir () {
-	while [[ ${MOST_RECENT} -ge $(date -r "${JAMULUS_RECORDING_DIR}" "+%s") &&
+	while [[ ${MOST_RECENT} -lt $(date -r "${JAMULUS_RECORDING_DIR}" "+%s") &&
 		-z $(find -L "${JAMULUS_RECORDING_DIR}" -mindepth 1 -type d -prune) ]]
 	do
 		inotifywait -q -t ${CHECK_INTERVAL} -e create -e close_write "${JAMULUS_RECORDING_DIR}"
@@ -60,4 +60,8 @@ wait_for_quiet () {
 while wait_for_new_jamdir && wait_for_quiet
 do
 	"${PUBLISH_SCRIPT}" || true
+	if [[ ! -z $(find -L "${JAMULUS_RECORDING_DIR}" -mindepth 1 -type d -prune) ]]
+	then
+		echo >&2 "${JAMULUS_RECORDING_DIR} has subdirectories"
+	fi
 done
