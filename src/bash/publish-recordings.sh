@@ -18,10 +18,42 @@
 #
 #    See LICENCE.txt for the full text.
 
+# Set to your Jamulus --recording/-R directory
 RECORDING_DIR=/opt/Jamulus/run/recording
-#RECORDING_HOST_DIR=drealm.info:html/jamulus/
+
+# Set to point to your target server ...
 RECORDING_HOST=drealm.info
-RECORDING_HOST_DIR=/public_html/jamulus
+# ... and location on that server
+# (ftp adds a leading "/", assuming the path to be relative to the FTP root;
+# scp does not, assuming the path to be relative to the SSH user home directory)
+RECORDING_HOST_DIR=public_html/jamulus
+
+# Pick "ftp" or "scp" for file transport
+TRANSPORT=scp
+
+function do_ftp () {
+	local zipFile=$1; shift  || { echo "do_ftp: Missing zip file name argument" >&2; false; return; }
+	local lZipSize=$1; shift || { echo "do_ftp: Missing zip file size argument" >&2; false; return; }
+
+	[[ -f "$zipFile" ]]      || { echo "do_ftp: $zipFile is not a file"; false; return; }
+
+	local rZipFile="/${RECORDING_HOST_DIR}/${zipFile}"
+
+	echo put '"'${zipFile}'"' '"'${rZipFile}'"' | ftp -p ${RECORDING_HOST}
+	read x x x x rZipSize x < <(echo ls '"'${rZipFile}'"' | ftp -p ${RECORDING_HOST})
+	echo lZipFile ${zipFile} $lZipSize';' rZipFile ${rZipFile} $rZipSize
+
+	[[ $lZipSize == $rZipSize ]]
+}
+
+function do_scp () {
+	local zipFile=$1; shift || { echo "do_scp: Missing zip file argument"; false; return; }
+	local lZipSize=$1; shift; # Not a required argument
+
+	[[ -f "$zipFile" ]]     || { echo "do_scp: $zipFile is not a file"; false; return; }
+
+	scp -o ConnectionAttempts=6 "${zipFile}" ${RECORDING_HOST}:${RECORDING_HOST_DIR}
+}
 
 cd "${RECORDING_DIR}"
 
@@ -85,7 +117,7 @@ do
 			sed -e 's/\.wav/.opus/' -e 's/WAVE/OPUS/' \
 				"${rppFile}" > "${rppFile}.tmp" && \
 				mv "${rppFile}.tmp" "${rppFile}"
-			# Note, Audacity won't like the OPUS files...
+			# Note, Audacity won't like the OPUS files natively...
 		else
 			# As no items were left, remove the project
 			echo "Removed ${rppFile}"
@@ -104,19 +136,14 @@ do
 			rm -r "${jamDir}"
 			read x x x x lZipSize x < <(ls -l "${jamDir}.zip")
 			i=10
-			# while [[ $i -gt 0 ]] && ! scp -o ConnectionAttempts=6 "${jamDir}.zip" ${RECORDING_HOST_DIR}
-			while [[ $i -gt 0 ]] && ! {
-				echo put '"'"${jamDir}.zip"'"' '"'"${RECORDING_HOST_DIR}/${jamDir#./}.zip"'"'
-				echo put '"'"${jamDir}.zip"'"' '"'"${RECORDING_HOST_DIR}/${jamDir#./}.zip"'"' | ftp -p ${RECORDING_HOST}
-				read x x x x rZipSize x < <(echo ls '"'"${RECORDING_HOST_DIR}/${jamDir#./}.zip"'"' | ftp -p ${RECORDING_HOST})
-				echo lZipSize $lZipSize rZipSize $rZipSize
-				[[ $lZipSize == $rZipSize ]]
-			}
+			echo ${TRANSPORT} "${jamDir#./}.zip" "(${lZipSize})" to ${RECORDING_HOST}:${RECORDING_HOST_DIR}
+			while [[ $i -gt 0 ]] && ! do_${TRANSPORT} "${jamDir#./}.zip" "${lZipSize}"
 			do
 				(( i-- ))
 				sleep $(( 11 - i ))
 			done
-			[[ $i -gt 0 ]]
+			[[ $i -gt 0 ]] || { echo Failed to${TRANSPORT} "${jamDir#./}.zip" "(${lZipSize})" to ${RECORDING_HOST}:${RECORDING_HOST_DIR} >&2; false; }
+			echo OK
 		}
 	fi
 
