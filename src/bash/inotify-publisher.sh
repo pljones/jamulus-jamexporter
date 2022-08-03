@@ -21,10 +21,10 @@
 # Configuration
 JAMULUS_ROOT=/opt/Jamulus
 JAMULUS_RECORDING_DIR=${JAMULUS_ROOT}/run/recording
-JAMULUS_STATUSPAGE=${JAMULUS_ROOT}/run/status.html
+JAMULUS_LOGFILE=${JAMULUS_ROOT}/log/Jamulus.log
 PUBLISH_SCRIPT=${JAMULUS_ROOT}/bin/publish-recordings.sh
 CHECK_INTERVAL=$(( 5 * 60 ))
-NO_CLIENT_CONNECTED="No client connected"
+NO_CLIENT_CONNECTED=',, server \(stopped\|idling\) --*-$'
 
 # Most recent processing check
 MOST_RECENT=0
@@ -43,16 +43,16 @@ wait_for_new_jamdir () {
 
 # Do not return until the server has no connections
 wait_for_quiet () {
-	# wait until the status page exists
-	while ! test -f "${JAMULUS_STATUSPAGE}"
+	# wait until the log file exists
+	while ! test -f "${JAMULUS_LOGFILE}"
 	do
-		inotifywait -q -e create -e close_write "${JAMULUS_STATUSPAGE}"
+		inotifywait -q -e create -e close_write "${JAMULUS_LOGFILE}"
 	done
 
 	# wait until no one connected
-	while ! grep -q "${NO_CLIENT_CONNECTED}" "${JAMULUS_STATUSPAGE}"
+	while ! tail -1 "${JAMULUS_LOGFILE}" | grep -q -- "${NO_CLIENT_CONNECTED}"
 	do
-		inotifywait -q -e close_write "${JAMULUS_STATUSPAGE}"
+		inotifywait -q -e close_write "${JAMULUS_LOGFILE}"
 	done
 	true
 }
