@@ -21,21 +21,25 @@
 # Configuration
 JAMULUS_ROOT=/opt/Jamulus
 JAMULUS_RECORDING_DIR=${JAMULUS_ROOT}/run/recording
+NEW_JAMDIR_INTERVAL=$(( 5 * 60 ))
 JAMULUS_LOGFILE=${JAMULUS_ROOT}/log/Jamulus.log
 PUBLISH_SCRIPT=${JAMULUS_ROOT}/bin/publish-recordings.sh
-CHECK_INTERVAL=$(( 5 * 60 ))
 NO_CLIENT_CONNECTED=',, server \(stopped\|idling\) --*-$'
+NO_CLIENT_INTERVAL=$(( 10 ))
+LOG_WRITE_INTERVAL=$(( 5 * 60 ))
 
 # Most recent processing check
 MOST_RECENT=0
 
 # Do not return until a new jamdir exists in the recording dir
 wait_for_new_jamdir () {
+echo "wait_for_new_jamdir"
 	while [[ ${MOST_RECENT} -lt $(date -r "${JAMULUS_RECORDING_DIR}" "+%s") &&
 		-z $(find -L "${JAMULUS_RECORDING_DIR}" -mindepth 1 -type d -prune) ]]
 	do
-		inotifywait -q -t ${CHECK_INTERVAL} -e create -e close_write "${JAMULUS_RECORDING_DIR}"
+		inotifywait -q -t ${NEW_JAMDIR_INTERVAL} -e create -e close_write "${JAMULUS_RECORDING_DIR}"
 	done
+echo "wait_for_new_jamdir: new jamdir created"
 	MOST_RECENT=$(date -r "${JAMULUS_RECORDING_DIR}" "+%s")
 	true
 }
@@ -43,17 +47,23 @@ wait_for_new_jamdir () {
 
 # Do not return until the server has no connections
 wait_for_quiet () {
+echo "wait_for_quiet"
 	# wait until the log file exists
 	while ! test -f "${JAMULUS_LOGFILE}"
 	do
 		inotifywait -q -e create -e close_write "${JAMULUS_LOGFILE}"
 	done
+echo "wait_for_quiet: logfile exists"
 
-	# wait until no one connected
+	# we may get lucky and no client is connected - but need to wait briefly
+	sleep ${NO_CLIENT_INTERVAL}
+
+	# otherwise wait until no one connected, check on each log write
 	while ! tail -1 "${JAMULUS_LOGFILE}" | grep -q -- "${NO_CLIENT_CONNECTED}"
 	do
-		inotifywait -q -e close_write "${JAMULUS_LOGFILE}"
+		inotifywait -q -t ${LOG_WRITE_INTERVAL} -e close_write "${JAMULUS_LOGFILE}"
 	done
+echo "wait_for_quiet: no one connected"
 	true
 }
 
