@@ -142,7 +142,7 @@ do
 				(( i-- ))
 				sleep $(( 11 - i ))
 			done
-			[[ $i -gt 0 ]] || { echo Failed to${TRANSPORT} "${jamDir#./}.zip" "(${lZipSize})" to ${RECORDING_HOST}:${RECORDING_HOST_DIR} >&2; false; }
+			[[ $i -gt 0 ]] || { echo Failed to ${TRANSPORT} "${jamDir#./}.zip" "(${lZipSize})" to ${RECORDING_HOST}:${RECORDING_HOST_DIR} >&2; false; }
 			echo OK
 		}
 	fi
