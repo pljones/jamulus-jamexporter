@@ -29,18 +29,25 @@ NO_CLIENT_INTERVAL=$(( 10 ))
 LOG_WRITE_INTERVAL=$(( 5 * 60 ))
 
 # Most recent processing check
-MOST_RECENT=0
+MOST_RECENT=9999999999
 
 # Do not return until a new jamdir exists in the recording dir
 wait_for_new_jamdir () {
 echo "wait_for_new_jamdir"
-	while [[ ${MOST_RECENT} -lt $(date -r "${JAMULUS_RECORDING_DIR}" "+%s") &&
-		-z $(find -L "${JAMULUS_RECORDING_DIR}" -mindepth 1 -type d -prune) ]]
+	while true
 	do
+		[[ ! -z $(find -L "${JAMULUS_RECORDING_DIR}" -mindepth 1 -type d -prune) ]] && {
+echo "wait_for_new_jamdir: there is definitely a directory awaiting processing - go wait for end of session"
+			break
+		}
+		[[ ${MOST_RECENT} -lt $(date -r "${JAMULUS_RECORDING_DIR}" "+%s") ]] && {
+echo "wait_for_new_jamdir: jamdir changed since last check - go check"
+			break
+		}
+echo "wait_for_new_jamdir: otherwise sleep for a while or until something happens"
 		inotifywait -q -t ${NEW_JAMDIR_INTERVAL} -e create -e close_write "${JAMULUS_RECORDING_DIR}"
 	done
 echo "wait_for_new_jamdir: new jamdir created"
-	MOST_RECENT=$(date -r "${JAMULUS_RECORDING_DIR}" "+%s")
 	true
 }
 #
@@ -49,27 +56,36 @@ echo "wait_for_new_jamdir: new jamdir created"
 wait_for_quiet () {
 echo "wait_for_quiet"
 	# wait until the log file exists
-	while ! test -f "${JAMULUS_LOGFILE}"
+	while true
 	do
+		[ -f "${JAMULUS_LOGFILE}" ] && {
+echo "wait_for_quiet: logfile exists"
+			break
+		}
 		inotifywait -q -e create -e close_write "${JAMULUS_LOGFILE}"
 	done
-echo "wait_for_quiet: logfile exists"
 
 	# we may get lucky and no client is connected - but need to wait briefly
 	sleep ${NO_CLIENT_INTERVAL}
 
 	# otherwise wait until no one connected, check on each log write
-	while ! tail -1 "${JAMULUS_LOGFILE}" | grep -q -- "${NO_CLIENT_CONNECTED}"
+	while true
 	do
+		{ tail -1 "${JAMULUS_LOGFILE}" | grep -q -- "${NO_CLIENT_CONNECTED}"; } && {
+echo "wait_for_quiet: no one connected"
+			break
+		}
 		inotifywait -q -t ${LOG_WRITE_INTERVAL} -e close_write "${JAMULUS_LOGFILE}"
 	done
-echo "wait_for_quiet: no one connected"
 	true
 }
 
 while wait_for_new_jamdir && wait_for_quiet
 do
+echo "jamdir and quiet... publishing"
 	"${PUBLISH_SCRIPT}" || true
+echo "updating MOST_RECENT"
+	MOST_RECENT=$(date -r "${JAMULUS_RECORDING_DIR}" "+%s")
 	if [[ ! -z $(find -L "${JAMULUS_RECORDING_DIR}" -mindepth 1 -type d -prune) ]]
 	then
 		echo >&2 "${JAMULUS_RECORDING_DIR} has subdirectories"
