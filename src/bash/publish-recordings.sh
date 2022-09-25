@@ -18,6 +18,8 @@
 #
 #    See LICENCE.txt for the full text.
 
+# TODO: Add lof file autoediting support
+
 # Set to your Jamulus --recording/-R directory
 RECORDING_DIR=/opt/Jamulus/run/recording
 
