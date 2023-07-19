@@ -59,24 +59,25 @@ function do_scp () {
 
 cd "${RECORDING_DIR}"
 
-find -maxdepth 1 -type d -name 'Jam-*' | sort | \
+find -maxdepth 1 -type d -name 'Jam-*' | sed -e 's,^\./,,' | sort | \
 while read jamDir
 do
-	rppFile="${jamDir#./}.rpp"
-	[[ -f "${jamDir}/${rppFile}" ]] || continue
+	rppFile="${jamDir}.rpp"
+	lofFile="${jamDir}.lof"
+	[[ -f "${jamDir}/${rppFile}" ]] || [[ -f "${jamDir}/${lofFile}" ]] || continue
 	(
 		cd "$jamDir"
 
-		find -maxdepth 1 -type f -name '*.wav' | sort | while read wavFile
+		find -maxdepth 1 -type f -name '*.wav' | sed -e 's,^\./,,' | sort | while read wavFile
 		do
 			lra=0
 			integrated=0
-			removeWaveFromRpp=false
+			removeWaveFile=false
 
 			duration=$(ffprobe -v 0 -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$wavFile")
 			if [[ ${duration%.*} -lt 60 ]]
 			then
-				removeWaveFromRpp=true
+				removeWaveFile=true
 				echo -n ''
 			else
 				opusFile="${wavFile%.wav}.opus"
@@ -89,26 +90,32 @@ do
 				lra=${stats[1]}
 				echo "$duration $lra $integrated" | awk '{ if ( $1 >= 60 && ( $2 > 6 || $3 > -48 ) ) exit 0; exit 1 }' || {
 					rm "${opusFile}"
-					removeWaveFromRpp=true
+					removeWaveFile=true
 				}
 			fi
 
-			if $removeWaveFromRpp
+			if $removeWaveFile
 			then
-				echo "Removed ${wavFile} - duration $duration, lra $lra, integrated $integrated"
-				# Magic sed command to remove an item from a track with a particular source wave file
+				echo "Remove '${wavFile}' - duration $duration, lra $lra, integrated $integrated"
+				# Magic sed command to remove an item from an RPP track with a particular source wave file
 				sed -e '/^    <ITEM */{N;N;N;N;N;N;N;N;N;N;N;N}' \
-					-e "\%^ *<SOURCE WAVE\n *FILE *[^>]*${wavFile}\"\n *>\n%Md" \
+					-e "\%^ *<SOURCE WAVE\n *FILE *[^>]*\/${wavFile}\"\n *>\n%Md" \
 					"${rppFile}" > "${rppFile}.tmp" && \
 					mv "${rppFile}.tmp" "${rppFile}"
+				# Remove lines from a LOF file with a particular source wave file
+				(
+					set +e
+					grep -v "^file \"[^\"]*${wavFile}\"" "${lofFile}" > "${lofFile}.tmp"
+					[ $? -lt 2 ] && mv "${lofFile}.tmp" "${lofFile}"
+				)
 			else
-				echo "Kept ${opusFile} - duration $duration, lra $lra, integrated $integrated"
+				echo "Keep ${opusFile} - duration $duration, lra $lra, integrated $integrated"
 			fi
 
 			rm "$wavFile"
 		done
 
-		# Magic sed command to remove empty tracks
+		# Magic sed command to remove empty RPP tracks
 		sed -e '/^  <TRACK {/{N;N;N}' -e '/^ *<TRACK\([^>]\|\n\)*>$/d' \
 			"${rppFile}" > "${rppFile}.tmp" && \
 			mv "${rppFile}.tmp" "${rppFile}"
@@ -119,13 +126,20 @@ do
 			sed -e 's/\.wav/.opus/' -e 's/WAVE/OPUS/' \
 				"${rppFile}" > "${rppFile}.tmp" && \
 				mv "${rppFile}.tmp" "${rppFile}"
-			# Note, Audacity won't like the OPUS files natively...
 		else
 			# As no items were left, remove the project
 			echo "Removed ${rppFile}"
 			rm "${rppFile}"
-			echo "Removed ${rppFile/rpp/lof}"
-			rm "${rppFile/rpp/lof}"
+		fi
+
+		if grep -q '^file' "${lofFile}"
+		then
+			# Replace any remaining references to WAV files with OPUS compressed versions
+			# Note, Audacity may not like the OPUS files natively...
+			sed -e 's/\.wav/.opus/' "${lofFile}" > "${lofFile}.tmp" && mv "${lofFile}.tmp" "${lofFile}"
+		else
+			echo "Removed ${lofFile}"
+			rm "${lofFile}"
 		fi
 
 	)
@@ -134,17 +148,17 @@ do
 	then
 		rmdir "${jamDir}"
 	else
-		zip -r "${jamDir}.zip" "${jamDir}" -i '*.opus' '*.rpp' && {
+		zip -r "${jamDir}.zip" "${jamDir}" -i '*.opus' '*.rpp' '*.lof' && {
 			rm -r "${jamDir}"
 			read x x x x lZipSize x < <(ls -l "${jamDir}.zip")
 			i=10
-			echo ${TRANSPORT} "${jamDir#./}.zip" "(${lZipSize})" to ${RECORDING_HOST}:${RECORDING_HOST_DIR}
-			while [[ $i -gt 0 ]] && ! do_${TRANSPORT} "${jamDir#./}.zip" "${lZipSize}"
+			echo ${TRANSPORT} "${jamDir}.zip" "(${lZipSize})" to ${RECORDING_HOST}:${RECORDING_HOST_DIR}
+			while [[ $i -gt 0 ]] && ! do_${TRANSPORT} "${jamDir}.zip" "${lZipSize}"
 			do
 				(( i-- ))
 				sleep $(( 11 - i ))
 			done
-			[[ $i -gt 0 ]] || { echo Failed to ${TRANSPORT} "${jamDir#./}.zip" "(${lZipSize})" to ${RECORDING_HOST}:${RECORDING_HOST_DIR} >&2; false; }
+			[[ $i -gt 0 ]] || { echo Failed to ${TRANSPORT} "${jamDir}.zip" "(${lZipSize})" to ${RECORDING_HOST}:${RECORDING_HOST_DIR} >&2; false; }
 			echo OK
 		}
 	fi
