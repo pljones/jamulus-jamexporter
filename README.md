@@ -39,8 +39,7 @@ to recordings that you might not want.  It was written to do what I needed and i
 work from, _not_ as a working solution to your needs.
 
 ### What it does
-Given the right `RECORDING_DIR`, this iterates over all subdirectories, looking for Reaper RPP files.
-(Currently, the Audacity LOF files are ignored and become wrong.)
+Given the right `RECORDING_DIR`, this iterates over all subdirectories, looking for Reaper RPP files or Audacity LOF files.
 
 The logical processing is as follows.
 
@@ -49,8 +48,7 @@ is considered "too short" or "too quiet", it is removed (deleted on disk and edi
 Retained files then have audio compression applied, updating the RPP file with the new name (i.e. WAV -> OPUS).
 Any _track_ that now has no entries is also removed.  If the project has no tracks, the recording directory is deleted.
 
-After the above processing, any remaining recording directory gets zipped (without the broken LOF)
-and uploaded to `RECORDING_HOST_DIR`.
+After the above processing, any remaining recording directory gets zipped and uploaded to `RECORDING_HOST_DIR`.
 
 ### Configuration
 

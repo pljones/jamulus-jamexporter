@@ -25,7 +25,7 @@ NEW_JAMDIR_INTERVAL=$(( 5 * 60 ))
 JAMULUS_LOGFILE=${JAMULUS_ROOT}/log/Jamulus.log
 PUBLISH_SCRIPT=${JAMULUS_ROOT}/bin/publish-recordings.sh
 NO_CLIENT_CONNECTED=',, server \(stopped\|idling\) --*-$'
-NO_CLIENT_INTERVAL=$(( 10 ))
+NO_CLIENT_INTERVAL=$(( 30 ))
 LOG_WRITE_INTERVAL=$(( 5 * 60 ))
 
 # Most recent processing check
@@ -68,6 +68,7 @@ echo "wait_for_quiet: logfile exists"
 	# we may get lucky and no client is connected - but need to wait briefly
 	sleep ${NO_CLIENT_INTERVAL}
 
+echo "wait_for_quiet: wait for no client connected"
 	# otherwise wait until no one connected, check on each log write
 	while true
 	do
@@ -75,6 +76,7 @@ echo "wait_for_quiet: logfile exists"
 echo "wait_for_quiet: no one connected"
 			break
 		}
+echo "wait_for_quiet: otherwise sleep for a while or until something happens"
 		inotifywait -q -t ${LOG_WRITE_INTERVAL} -e close_write "${JAMULUS_LOGFILE}"
 	done
 	true
