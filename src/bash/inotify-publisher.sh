@@ -23,10 +23,10 @@ JAMULUS_ROOT=/opt/Jamulus
 JAMULUS_RECORDING_DIR=${JAMULUS_ROOT}/run/recording
 NEW_JAMDIR_INTERVAL=$(( 5 * 60 ))
 JAMULUS_LOGFILE=${JAMULUS_ROOT}/log/Jamulus.log
-PUBLISH_SCRIPT=${JAMULUS_ROOT}/bin/publish-recordings.sh
-NO_CLIENT_CONNECTED=',, server \(stopped\|idling\) --*-$'
 NO_CLIENT_INTERVAL=$(( 30 ))
+NO_CLIENT_CONNECTED=',, server \(stopped\|idling\) --*-$'
 LOG_WRITE_INTERVAL=$(( 5 * 60 ))
+PUBLISH_SCRIPT=${JAMULUS_ROOT}/bin/publish-recordings.sh
 
 # Most recent processing check
 MOST_RECENT=9999999999

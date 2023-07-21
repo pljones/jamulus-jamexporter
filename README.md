@@ -2,10 +2,10 @@
 
 _General note:_
 
-The scripts here are derived from what I use on my own server - they have been altered to be less dependent
-on the way I run my server and hence are not scripts I actually run.  Which means my changes are subject to bugs.
+The scripts here are what I use on my own server - so they might not be best suited to how you run yours.
+Please read both this document _and_ the scripts themselves before use.
 
-This comprises two scripts:
+There are two scripts for the **Jam Exporter**:
 * A bash script to monitor the Jamulus recording base directory for new recordings
 * A bash script to apply some judicious rules and compression before uploading the recordings offsite
 
@@ -20,12 +20,20 @@ match how you usually run Jamulus.
 The configuration section at the top has the following:
 * `JAMULUS_ROOT=/opt/Jamulus`
 * `JAMULUS_RECORDING_DIR=${JAMULUS_ROOT}/run/recording`
-* `JAMULUS_STATUSPAGE=${JAMULUS_ROOT}/run/status.html`
+* `NEW_JAMDIR_INTERVAL=$(( 5 * 60 ))`
+* `JAMULUS_LOGFILE=${JAMULUS_ROOT}/log/Jamulus.log`
+* `NO_CLIENT_INTERVAL=$(( 30 ))`
+* `NO_CLIENT_CONNECTED=',, server \(stopped\|idling\) --*-$'`
+* `LOG_WRITE_INTERVAL=$(( 5 * 60 ))`
 * `PUBLISH_SCRIPT=${JAMULUS_ROOT}/bin/publish-recordings.sh`
-* `NO_CLIENT_CONNECTED="No client connected"`
 
 You may need to edit more than just `JAMULUS_ROOT` - adjust to suit.
-I'm not sure if the status file entry `NO_CLIENT_CONNECT` gets translated - if so, the local value is needed here.
+I'm not sure if the server log file entry `NO_CLIENT_CONNECT` gets translated - if so, the local value is needed here.
+
+The `..._INTERVAL` entries are used to tune the amount of checking the script does... and reduce the amount of logging.
+I like to know the script is running, so I set the time out to something that won't generate too much cruft but will show
+a regular pulse to let me know it's alive.  `NO_CLIENT_INTERVAL` allows the server time to decide all departed clients
+have really left and write the `idling` line.
 
 The script uses one program that you might not have installed by default, `inotifywait`.
 * http://inotify-tools.sourceforge.net/
@@ -38,19 +46,13 @@ I would expect your distribution makes this available.
 to recordings that you might not want.  It was written to do what I needed and is provided for people to have a base to
 work from, _not_ as a working solution to your needs.
 
-### What it does
-Given the right `RECORDING_DIR`, this iterates over all subdirectories, looking for Reaper RPP files or Audacity LOF files.
-
-The logical processing is as follows.
-
-For each RPP file, the WAV files are examined to determine their audio length and (EBU) volume.  Where the file
-is considered "too short" or "too quiet", it is removed (deleted on disk and edited out of the RPP file).
-Retained files then have audio compression applied, updating the RPP file with the new name (i.e. WAV -> OPUS).
-Any _track_ that now has no entries is also removed.  If the project has no tracks, the recording directory is deleted.
-
-After the above processing, any remaining recording directory gets zipped and uploaded to `RECORDING_HOST_DIR`.
-
 ### Configuration
+
+The configuration section here is simpler:
+* `RECORDING_DIR=/opt/Jamulus/run/recording`
+* `RECORDING_HOST=drealm.info`
+* `RECORDING_HOST_DIR=public_html/jamulus`
+* `TRANSPORT=scp`
 
 There is one main dependency here: the FFMpeg suite - both `ffprobe` and `ffmpeg` itself are used.
 * https://ffmpeg.org/
@@ -60,13 +62,26 @@ It also uses `zip`.
 
 Most distributions provide versions that will be adequate.
 
-The configuration section here is simpler:
-* `RECORDING_DIR=/opt/Jamulus/run/recording`
-* `RECORDING_HOST_DIR=drealm.info:html/jamulus/`
+### What it does
+The main point of this is to publish to publicly accessibly locations recordings that have been made by the Jamulus server.
+Given the right `RECORDING_DIR`, this iterates over all subdirectories, looking for Reaper RPP files or Audacity LOF files.
 
-The script off-sites the recordings - `RECORDING_HOST_DIR` is the target.  It uses `scp` as the user running the script.
-If run from `inotify-publisher.sh` under the systemd service, that will be the `User=` user.  Make sure you have installed
-that user's public key in your hosting provider's `authorized_keys` (using the expected key type).
+The logical processing is as follows.
+
+For each recording directory, the WAV files are examined to determine their audio length and (EBU) volume.  Where the file
+is considered "too short" or "too quiet", it is removed (deleted on disk and edited out of the RPP and LOF files).
+Retained files then have audio compression applied, updating the RPP and LOF files with the new name (i.e. WAV -> OPUS).
+Any RPP _track_ that now has no entries is also removed.
+If the RPP or LOF project has no tracks, the recording directory is deleted.
+
+After the above processing, any remaining recording directory gets zipped and uploaded to `RECORDING_HOST_DIR`
+on `RECORDING_HOST`, using `TRANSPORT`, which can be `scp` or `ftp`.
+
+If run from `inotify-publisher.sh` under the systemd service, the script will be run as the `User=` user.
+Ensuring the script has access to authentication details relies on either `.ssh/config` (for `ssh`)
+or `.netrc` (for `ftp`) for the user running the script.
+For `ssh`, make sure you have also installed that user's public key in your hosting provider's `authorized_keys`
+(using the expected key type).
 
 
 ## recover-recording.sh
