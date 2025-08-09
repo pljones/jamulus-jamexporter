@@ -30,8 +30,17 @@ RECORDING_HOST=drealm.info
 # scp does not, assuming the path to be relative to the SSH user home directory)
 RECORDING_HOST_DIR=public_html/jamulus
 
-# Pick "ftp" or "scp" for file transport
-TRANSPORT=scp
+# Pick "ftp" or "scp" for file transport.  Pick "echo" not to offsite the files.
+#TRANSPORT=ftp
+#TRANSPORT=scp
+TRANSPORT=echo
+
+function do_echo () {
+	local zipFile=$1; shift  || { echo "do_echo: Missing zip file name argument" >&2; false; return; }
+	local lZipSize=$1; shift || { echo "do_echo: Missing zip file size argument" >&2; false; return; }
+
+	[[ -f "$zipFile" ]]      || { echo "do_echo: $zipFile is not a file"; false; return; }
+}
 
 function do_ftp () {
 	local zipFile=$1; shift  || { echo "do_ftp: Missing zip file name argument" >&2; false; return; }
