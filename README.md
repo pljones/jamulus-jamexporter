@@ -50,6 +50,7 @@ work from, _not_ as a working solution to your needs.
 
 The configuration section here is simpler:
 * `RECORDING_DIR=/opt/Jamulus/run/recording`
+* `MIN_TRACKS=1`
 * `RECORDING_HOST=drealm.info`
 * `RECORDING_HOST_DIR=public_html/jamulus`
 * `TRANSPORT=scp`
@@ -72,7 +73,7 @@ For each recording directory, the WAV files are examined to determine their audi
 is considered "too short" or "too quiet", it is removed (deleted on disk and edited out of the RPP and LOF files).
 Retained files then have audio compression applied, updating the RPP and LOF files with the new name (i.e. WAV -> OPUS).
 Any RPP _track_ that now has no entries is also removed.
-If the RPP or LOF project has no tracks, the recording directory is deleted.
+If there are fewer than `MIN_TRACKS` opus files, the recording directory is deleted.
 
 After the above processing, any remaining recording directory gets zipped to a file named after the
 original subdirectory.

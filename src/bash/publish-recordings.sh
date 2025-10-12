@@ -23,6 +23,9 @@
 # Set to your Jamulus --recording/-R directory
 RECORDING_DIR=/opt/Jamulus/run/recording
 
+# Set to minimum number of audible tracks in recording directory after clean up
+MIN_TRACKS=2
+
 # Set to point to your target server ...
 RECORDING_HOST=drealm.info
 # ... and location on that server
@@ -153,9 +156,11 @@ do
 
 	)
 
-	if [[ "$(cd "${jamDir}"; echo *)" == "*" ]]
+	if [[ "$(cd "${jamDir}"; ls -1 | grep -i '\.opus$' | wc -l)" -lt $MIN_TRACKS ]]
 	then
-		rmdir "${jamDir}"
+		# As too few tracks were left, remove the project
+		echo "Removed ${jamDir}"
+		rm -r "${jamDir}"
 	else
 		zip -r "${jamDir}.zip" "${jamDir}" -i '*.opus' '*.rpp' '*.lof' && {
 			rm -r "${jamDir}"
