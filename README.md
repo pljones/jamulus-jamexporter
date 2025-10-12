@@ -74,8 +74,10 @@ Retained files then have audio compression applied, updating the RPP and LOF fil
 Any RPP _track_ that now has no entries is also removed.
 If the RPP or LOF project has no tracks, the recording directory is deleted.
 
-After the above processing, any remaining recording directory gets zipped and uploaded to `RECORDING_HOST_DIR`
-on `RECORDING_HOST`, using `TRANSPORT`, which can be `scp` or `ftp`.
+After the above processing, any remaining recording directory gets zipped to a file named after the
+original subdirectory.
+Where `TRANSPORT` is `scp` or `ftp`, the file will be uploaded to `RECORDING_HOST_DIR` on `RECORDING_HOST`.
+Where `TRANSPORT` is `echo`, the zip file remains in `RECORDING_DIR`.
 
 If run from `inotify-publisher.sh` under the systemd service, the script will be run as the `User=` user.
 Ensuring the script has access to authentication details relies on either `.ssh/config` (for `ssh`)
